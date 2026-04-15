@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>AI Chatbot</title>
+    <style>
+        body {
+            font-family: Arial;
+            background: #f5f5f5;
+        }
+
+        #chat-box {
+            width: 400px;
+            height: 500px;
+            border: 1px solid #ccc;
+            margin: 20px auto;
+            padding: 10px;
+            overflow-y: scroll;
+            background: white;
+            border-radius: 10px;
+        }
+
+        .user {
+            text-align: right;
+            margin: 5px;
+            color: blue;
+        }
+
+        .bot {
+            text-align: left;
+            margin: 5px;
+            color: green;
+        }
+
+        #input-area {
+            width: 400px;
+            margin: auto;
+            display: flex;
+        }
+
+        input {
+            flex: 1;
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+        }
+
+        button {
+            padding: 10px;
+            margin-left: 5px;
+            border-radius: 5px;
+            border: none;
+            background: #007bff;
+            color: white;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+
+<body>
+
+<div id="chat-box"></div>
+
+<div id="input-area">
+    <input type="text" id="user-input" placeholder="Type a message..." />
+    <button onclick="sendMessage()">Send</button>
+</div>
+
+<script>
+    const backendURL = "https://ai-backend-aqqk.onrender.com/chat";
+
+    // ✅ Generate or get unique user ID
+    let userId = localStorage.getItem("user_id");
+
+    if (!userId) {
+        userId = Math.random().toString(36).substring(2);
+        localStorage.setItem("user_id", userId);
+    }
+
+    // ✅ Add message to UI
+    function addMessage(sender, text) {
+        const chatBox = document.getElementById("chat-box");
+
+        const msg = document.createElement("div");
+        msg.className = sender;
+
+        msg.innerHTML = text.replace(/\n/g, "<br>");
+
+        chatBox.appendChild(msg);
+
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    // ✅ Send message to backend
+    async function sendMessage() {
+        const input = document.getElementById("user-input");
+        const message = input.value;
+
+        if (!message) return;
+
+        addMessage("user", message);
+        input.value = "";
+
+        try {
+            const response = await fetch(backendURL, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    user_id: userId,
+                    message: message
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.reply) {
+                addMessage("bot", data.reply);
+            } else {
+                addMessage("bot", "Error: No response");
+            }
+
+        } catch (error) {
+            addMessage("bot", "Error: Unable to reach server 😢");
+            console.error(error);
+        }
+    }
+
+    // ✅ Enter key support
+    document.getElementById("user-input")
+        .addEventListener("keypress", function(event) {
+            if (event.key === "Enter") {
+                sendMessage();
+            }
+        });
+</script>
+
+</body>
+</html>
