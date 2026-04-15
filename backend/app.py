@@ -5,11 +5,12 @@ import os
 import requests
 from dotenv import load_dotenv
 
+# Load environment variables
 load_dotenv()
 
 app = FastAPI()
 
-# ✅ CORS (important for frontend)
+# ✅ Enable CORS (important for frontend)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -21,21 +22,24 @@ app.add_middleware(
 # ✅ API KEY
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-# 🔥 USE AI
+# 🔥 Toggle AI
 USE_AI = True
 
-# In-memory storage (optional)
+# Optional: memory storage
 user_memory = {}
 
+# Request model
 class ChatRequest(BaseModel):
     user_id: str
     message: str
+
 
 # -------------------------
 # 🟢 MOCK (fallback)
 # -------------------------
 def get_mock_response(user_id, message):
     return "AI not enabled yet"
+
 
 # -------------------------
 # 🔵 GEMINI RESPONSE
@@ -57,14 +61,15 @@ def get_gemini_response(message):
         ]
     }
 
-    response = requests.post(url, headers=headers, json=data)
-
-    result = response.json()
-
     try:
+        response = requests.post(url, headers=headers, json=data)
+        result = response.json()
+
         return result["candidates"][0]["content"]["parts"][0]["text"]
-    except:
-        return f"Gemini Error: {result}"
+
+    except Exception as e:
+        return f"Gemini Error: {str(e)} | Full Response: {result}"
+
 
 # -------------------------
 # 🚀 ROOT ENDPOINT
@@ -72,6 +77,7 @@ def get_gemini_response(message):
 @app.get("/")
 def home():
     return {"status": "Backend running 🚀"}
+
 
 # -------------------------
 # 🚀 CHAT ENDPOINT
@@ -88,3 +94,14 @@ def chat(req: ChatRequest):
 
     except Exception as e:
         return {"reply": f"Error: {str(e)}"}
+
+
+# -------------------------
+# ▶️ RUN SERVER (FOR RENDER)
+# -------------------------
+if __name__ == "__main__":
+    import uvicorn
+
+    port = int(os.environ.get("PORT", 10000))
+
+    uvicorn.run(app, host="0.0.0.0", port=port)
