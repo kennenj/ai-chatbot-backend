@@ -10,7 +10,7 @@ load_dotenv()
 
 app = FastAPI()
 
-# ✅ Enable CORS (important for frontend)
+# ✅ CORS (important for frontend)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -22,54 +22,66 @@ app.add_middleware(
 # ✅ API KEY
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-# 🔥 Toggle AI
+# 🔥 USE AI
 USE_AI = True
 
-# Optional: memory storage
+# In-memory storage (optional, for future use)
 user_memory = {}
 
-# Request model
 class ChatRequest(BaseModel):
     user_id: str
     message: str
 
-
 # -------------------------
-# 🟢 MOCK (fallback)
+# 🟢 MOCK (fallback if AI disabled)
 # -------------------------
 def get_mock_response(user_id, message):
     return "AI not enabled yet"
 
-
 # -------------------------
-# 🔵 GEMINI RESPONSE
+# 🔵 GEMINI CALL FUNCTION
 # -------------------------
-def get_gemini_response(message):
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
+def call_gemini(model, message):
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}"
 
-    headers = {
-        "Content-Type": "application/json"
-    }
-
-    data = {
+    payload = {
         "contents": [
             {
-                "parts": [
-                    {"text": message}
-                ]
+                "parts": [{"text": message}]
             }
         ]
     }
 
-    try:
-        response = requests.post(url, headers=headers, json=data)
-        result = response.json()
+    response = requests.post(url, json=payload)
+    return response.json()
 
-        return result["candidates"][0]["content"]["parts"][0]["text"]
+# -------------------------
+# 🔵 GEMINI RESPONSE (RETRY + FALLBACK)
+# -------------------------
+def get_gemini_response(message):
+    models = [
+        "gemini-flash-latest",   # Primary (best + auto-updated)
+        "gemini-2.0-flash"      # Fallback (very stable)
+    ]
 
-    except Exception as e:
-        return f"Gemini Error: {str(e)} | Full Response: {result}"
+    for model in models:
+        for attempt in range(2):  # Retry twice per model
+            try:
+                result = call_gemini(model, message)
 
+                # ✅ Success case
+                if "candidates" in result:
+                    return result["candidates"][0]["content"]["parts"][0]["text"]
+
+                # ❌ If API error (like 503), try next attempt/model
+                if "error" in result:
+                    continue
+
+            except Exception:
+                continue
+
+    # ❌ Final fallback (user-friendly message)
+    return "Sorry, AI is busy right now. Please try again in a moment."
 
 # -------------------------
 # 🚀 ROOT ENDPOINT
@@ -77,7 +89,6 @@ def get_gemini_response(message):
 @app.get("/")
 def home():
     return {"status": "Backend running 🚀"}
-
 
 # -------------------------
 # 🚀 CHAT ENDPOINT
@@ -94,14 +105,3 @@ def chat(req: ChatRequest):
 
     except Exception as e:
         return {"reply": f"Error: {str(e)}"}
-
-
-# -------------------------
-# ▶️ RUN SERVER (FOR RENDER)
-# -------------------------
-if __name__ == "__main__":
-    import uvicorn
-
-    port = int(os.environ.get("PORT", 10000))
-
-    uvicorn.run(app, host="0.0.0.0", port=port)
